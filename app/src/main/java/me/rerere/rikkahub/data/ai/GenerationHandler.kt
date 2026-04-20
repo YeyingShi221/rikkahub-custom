@@ -64,6 +64,11 @@ class GenerationHandler(
     private val conversationRepo: ConversationRepository,
     private val aiLoggingManager: AILoggingManager,
 ) {
+    private fun errorOutput(message: String): List<UIMessagePart> = listOf(
+        UIMessagePart.Text(
+            json.encodeToString(buildJsonObject { put("error", JsonPrimitive(message)) })
+        )
+    )
     fun generateText(
         settings: Settings,
         model: Model,
@@ -92,39 +97,28 @@ class GenerationHandler(
                     } else {
                         assistant.id.toString()
                     }
+                    fun embedMemory(id: Long, content: String) {
+                        if (embeddingService == null) return
+                        try {
+                            embeddingService.embed(content)?.let {
+                                memoryRepo.updateEmbedding(id, it.toByteArray())
+                                Log.d(TAG, "Embedded memory: $id")
+                            } ?: Log.w(TAG, "Failed to embed memory: $id")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error embedding memory: $id", e)
+                        }
+                    }
                     buildMemoryTools(
                         json = json,
                         onCreation = { content ->
-                            val memory = memoryRepo.addMemory(memoryAssistantId, content)
-                            if (embeddingService != null) {
-                                try {
-                                    val embedding = embeddingService.embed(content)
-                                    if (embedding != null) {
-                                        memoryRepo.updateEmbedding(memory.id, embedding.toByteArray())
-                                        Log.d(TAG, "Embedded new memory: ${memory.id}")
-                                    } else {
-                                        Log.w(TAG, "Failed to embed new memory: ${memory.id}")
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error embedding new memory: ${memory.id}", e)
-                                }
+                            memoryRepo.addMemory(memoryAssistantId, content).also {
+                                embedMemory(it.id, content)
                             }
-                            memory
                         },
                         onUpdate = { id, content ->
-                            val memory = memoryRepo.updateContent(id, content)
-                            if (embeddingService != null) {
-                                try {
-                                    val embedding = embeddingService.embed(content)
-                                    if (embedding != null) {
-                                        memoryRepo.updateEmbedding(id, embedding.toByteArray())
-                                        Log.d(TAG, "Updated embedding for memory: $id")
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error updating embedding for memory: $id", e)
-                                }
+                            memoryRepo.updateContent(id, content).also {
+                                embedMemory(id, content)
                             }
-                            memory
                         },
                         onDelete = { id ->
                             memoryRepo.deleteMemory(id)
@@ -256,21 +250,9 @@ class GenerationHandler(
             toolsToProcess.forEach { tool ->
                 when (tool.approvalState) {
                     is ToolApprovalState.Denied -> {
-                        // Tool was denied by user
                         val reason = (tool.approvalState as ToolApprovalState.Denied).reason
                         executedTools += tool.copy(
-                            output = listOf(
-                                UIMessagePart.Text(
-                                    json.encodeToString(
-                                        buildJsonObject {
-                                            put(
-                                                "error",
-                                                JsonPrimitive("Tool execution denied by user. Reason: ${reason.ifBlank { "No reason provided" }}")
-                                            )
-                                        }
-                                    )
-                                )
-                            )
+                            output = errorOutput("Tool execution denied by user. Reason: ${reason.ifBlank { "No reason provided" }}")
                         )
                     }
 
@@ -296,40 +278,17 @@ class GenerationHandler(
                             // Return a clean instruction instead of a stack trace so the model stops retrying.
                             Log.w(TAG, "generateText: model called unregistered tool '${tool.toolName}' — returning disabled-notice")
                             executedTools += tool.copy(
-                                output = listOf(
-                                    UIMessagePart.Text(
-                                        json.encodeToString(
-                                            buildJsonObject {
-                                                put("error", JsonPrimitive("The tool '${tool.toolName}' is not available in this session. Do not call it again. Proceed with your response directly."))
-                                            }
-                                        )
-                                    )
-                                )
+                                output = errorOutput("The tool '${tool.toolName}' is not available in this session. Do not call it again. Proceed with your response directly.")
                             )
                         } else {
-                            runCatching {
+                            try {
                                 val args = json.parseToJsonElement(tool.input.ifBlank { "{}" })
                                 Log.i(TAG, "generateText: executing tool ${toolDef.name} with args: $args")
-                                val result = toolDef.execute(args)
-                                executedTools += tool.copy(output = result)
-                            }.onFailure {
-                                it.printStackTrace()
+                                executedTools += tool.copy(output = toolDef.execute(args))
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Tool execution failed: ${toolDef.name}", e)
                                 executedTools += tool.copy(
-                                    output = listOf(
-                                        UIMessagePart.Text(
-                                            json.encodeToString(
-                                                buildJsonObject {
-                                                    put(
-                                                        "error",
-                                                        JsonPrimitive(buildString {
-                                                            append("[${it.javaClass.name}] ${it.message}")
-                                                            append("\n${it.stackTraceToString()}")
-                                                        })
-                                                    )
-                                                }
-                                            )
-                                        )
-                                    )
+                                    output = errorOutput("[${e.javaClass.name}] ${e.message}\n${e.stackTraceToString()}")
                                 )
                             }
                         }
