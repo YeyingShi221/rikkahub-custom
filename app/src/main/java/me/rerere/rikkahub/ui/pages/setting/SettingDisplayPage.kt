@@ -308,6 +308,18 @@ fun SettingDisplayPage(vm: SettingVM = koinViewModel()) {
                             },
                         )
                         item(
+                            headlineContent = { Text("Show reasoning tokens") },
+                            supportingContent = { Text("Display thinking token count per message (Gemini, DeepSeek, o1/o3/GPT-5 reasoning models)") },
+                            trailingContent = {
+                                Switch(
+                                    checked = displaySetting.showReasoningTokens,
+                                    onCheckedChange = {
+                                        updateDisplaySetting(displaySetting.copy(showReasoningTokens = it))
+                                    }
+                                )
+                            },
+                        )
+                        item(
                             headlineContent = { Text(stringResource(R.string.setting_display_page_show_thinking_content_title)) },
                             supportingContent = { Text(stringResource(R.string.setting_display_page_show_thinking_content_desc)) },
                             trailingContent = {
@@ -347,6 +359,7 @@ fun SettingDisplayPage(vm: SettingVM = koinViewModel()) {
                             ChatFontFamily.DEFAULT to stringResource(R.string.setting_display_page_chat_font_family_default),
                             ChatFontFamily.SERIF to stringResource(R.string.setting_display_page_chat_font_family_serif),
                             ChatFontFamily.MONOSPACE to stringResource(R.string.setting_display_page_chat_font_family_monospace),
+                            ChatFontFamily.LXGW_WENKAI to "LXGW 文楷",
                         )
                         item(
                             headlineContent = { Text(stringResource(R.string.setting_display_page_chat_font_family_title)) },
@@ -371,6 +384,7 @@ fun SettingDisplayPage(vm: SettingVM = koinViewModel()) {
                                                     ChatFontFamily.DEFAULT -> FontFamily.Default
                                                     ChatFontFamily.SERIF -> FontFamily.Serif
                                                     ChatFontFamily.MONOSPACE -> FontFamily.Monospace
+                                                    ChatFontFamily.LXGW_WENKAI -> me.rerere.rikkahub.ui.theme.LxgwWenkaiMono
                                                 }
                                             )
                                         }
@@ -407,6 +421,7 @@ fun SettingDisplayPage(vm: SettingVM = koinViewModel()) {
                                                 ChatFontFamily.DEFAULT -> FontFamily.Default
                                                 ChatFontFamily.SERIF -> FontFamily.Serif
                                                 ChatFontFamily.MONOSPACE -> FontFamily.Monospace
+                                                ChatFontFamily.LXGW_WENKAI -> me.rerere.rikkahub.ui.theme.LxgwWenkaiMono
                                             }
                                         )
                                     )

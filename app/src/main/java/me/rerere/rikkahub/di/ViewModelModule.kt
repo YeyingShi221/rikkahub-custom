@@ -47,6 +47,9 @@ val viewModelModule = module {
             memoryRepository = get(),
             filesManager = get(),
             skillManager = get(),
+            embeddingService = get(),
+            conversationChunkRepository = get(),
+            conversationRepo = get(),
         )
     }
     viewModelOf(::TranslatorVM)

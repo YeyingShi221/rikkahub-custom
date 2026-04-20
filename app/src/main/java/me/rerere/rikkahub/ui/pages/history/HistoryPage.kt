@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.ui.pages.history;
 
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.Download01  // NEW - verify icon name
 import me.rerere.hugeicons.stroke.Pin
 import me.rerere.hugeicons.stroke.PinOff
 import me.rerere.hugeicons.stroke.GlobalSearch
@@ -64,6 +65,7 @@ fun HistoryPage(vm: HistoryVM = koinViewModel()) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }  // NEW
 
     val conversations by vm.conversations.collectAsStateWithLifecycle()
 
@@ -77,6 +79,15 @@ fun HistoryPage(vm: HistoryVM = koinViewModel()) {
                     BackButton()
                 },
                 actions = {
+                    // NEW: Export button (first position)
+                    IconButton(
+                        onClick = { showExportDialog = true }
+                    ) {
+                        Icon(
+                            HugeIcons.Download01,
+                            contentDescription = "Export chat history"
+                        )
+                    }
                     IconButton(
                         onClick = {
                             navController.navigate(Screen.MessageSearch)
@@ -115,7 +126,6 @@ fun HistoryPage(vm: HistoryVM = koinViewModel()) {
                     },
                     onDelete = {
                         scope.launch {
-                            // 先获取完整的对话数据（包含 messageNodes），用于撤销恢复
                             val fullConversation = vm.getFullConversation(conversation.id) ?: conversation
                             vm.deleteConversation(conversation)
                             val result = snackbarHostState.showSnackbar(
@@ -136,6 +146,28 @@ fun HistoryPage(vm: HistoryVM = koinViewModel()) {
             }
         }
     }
+
+    // NEW: Export dialog + handler
+    ExportDialog(
+        visible = showExportDialog,
+        conversations = conversations,
+        onDismiss = { showExportDialog = false },
+        onExport = { startDate, endDate, conversationIds ->
+            scope.launch {
+                val result = vm.exportConversations(startDate, endDate, conversationIds)
+                result.fold(
+                    onSuccess = { filename ->
+                        snackbarHostState.showSnackbar("Exported: $filename")
+                    },
+                    onFailure = { e ->
+                        snackbarHostState.showSnackbar(
+                            e.message ?: "Export failed"
+                        )
+                    }
+                )
+            }
+        }
+    )
 
     if (showDeleteAllDialog) {
         AlertDialog(

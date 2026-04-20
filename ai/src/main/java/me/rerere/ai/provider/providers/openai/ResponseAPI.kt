@@ -658,9 +658,13 @@ class ResponseAPI(
 
     private fun parseTokenUsage(jsonObject: JsonObject?): TokenUsage? {
         if (jsonObject == null) return null
+        val totalOutput = jsonObject["output_tokens"]?.jsonPrimitive?.intOrNull ?: 0
+        val reasoningTokens = jsonObject["output_tokens_details"]?.jsonObjectOrNull
+            ?.get("reasoning_tokens")?.jsonPrimitive?.intOrNull ?: 0
         return TokenUsage(
             promptTokens = jsonObject["input_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
-            completionTokens = jsonObject["output_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
+            completionTokens = (totalOutput - reasoningTokens).coerceAtLeast(0),
+            reasoningTokens = reasoningTokens,
             totalTokens = jsonObject["total_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
             cachedTokens = jsonObject["input_tokens_details"]?.jsonObjectOrNull?.get("cached_tokens")?.jsonPrimitive?.intOrNull
                 ?: 0

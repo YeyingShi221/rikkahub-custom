@@ -22,8 +22,14 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMemory
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.Tag
+import me.rerere.rikkahub.data.ai.EmbeddingService
+import me.rerere.rikkahub.data.db.entity.toByteArray
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import kotlin.uuid.Uuid
+
+import kotlinx.coroutines.flow.first
+import me.rerere.rikkahub.data.repository.ConversationChunkRepository
+import me.rerere.rikkahub.data.repository.ConversationRepository
 
 private const val TAG = "AssistantDetailVM"
 
@@ -33,8 +39,32 @@ class AssistantDetailVM(
     private val memoryRepository: MemoryRepository,
     private val filesManager: FilesManager,
     private val skillManager: SkillManager,
+    private val embeddingService: EmbeddingService,
+    private val conversationChunkRepository: ConversationChunkRepository,
+    private val conversationRepo: ConversationRepository,
 ) : ViewModel() {
     private val assistantId = Uuid.parse(id)
+
+    private val _totalChunks = MutableStateFlow(0)
+    val totalChunks = _totalChunks.asStateFlow()
+
+    private val _embeddedChunks = MutableStateFlow(0)
+    val embeddedChunks = _embeddedChunks.asStateFlow()
+
+    private val _chunkSize = MutableStateFlow(4000)
+    val chunkSize = _chunkSize.asStateFlow()
+
+    private val _overlapPercent = MutableStateFlow(15)
+    val overlapPercent = _overlapPercent.asStateFlow()
+
+    private val _isVectorizing = MutableStateFlow(false)
+    val isVectorizing = _isVectorizing.asStateFlow()
+
+    private val _vectorizationProgress = MutableStateFlow(0f)
+    val vectorizationProgress = _vectorizationProgress.asStateFlow()
+
+    private val _debugStatus = MutableStateFlow("")
+    val debugStatus = _debugStatus.asStateFlow()
 
     private val _skills = MutableStateFlow<List<SkillMetadata>>(emptyList())
     val skills = _skills.asStateFlow()
@@ -42,6 +72,89 @@ class AssistantDetailVM(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             _skills.value = skillManager.listSkills()
+            updateChunkCounts()
+        }
+    }
+
+    private suspend fun updateChunkCounts() {
+        val count = conversationChunkRepository.getChunkCountOfAssistant(assistantId.toString())
+        val embeddedCount = conversationChunkRepository.getEmbeddedChunkCountOfAssistant(assistantId.toString())
+        _totalChunks.value = count
+        _embeddedChunks.value = embeddedCount
+    }
+
+    fun setChunkSize(size: Int) {
+        _chunkSize.value = size
+        update(assistant.value.copy(chunkSize = size))
+    }
+
+    fun setOverlapPercent(percent: Int) {
+        _overlapPercent.value = percent
+        update(assistant.value.copy(overlapPercent = percent))
+    }
+
+    fun clearChatVectors() {
+        viewModelScope.launch(Dispatchers.IO) {
+            conversationChunkRepository.clearAllChunks(assistantId.toString())
+            updateChunkCounts()
+        }
+    }
+
+    fun vectorizeChat(onComplete: (Int) -> Unit) {
+        _debugStatus.value = "Starting... configured=${embeddingService.isConfigured}, assistantId=$assistantId"
+        if (!embeddingService.isConfigured) {
+            _debugStatus.value = "ERROR: No API key configured!"
+            onComplete(0)
+            return
+        }
+        if (_isVectorizing.value) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _isVectorizing.value = true
+            _vectorizationProgress.value = 0f
+
+            try {
+                val summaries = conversationRepo.getConversationsOfAssistant(assistantId).first()
+                _debugStatus.value = "Found ${summaries.size} conversations for $assistantId"
+                Log.d(TAG, "vectorizeChat: found ${summaries.size} conversations for assistant $assistantId")
+                val allMessages = mutableListOf<me.rerere.ai.ui.UIMessage>()
+                
+                summaries.forEachIndexed { index, summary ->
+                    val conv = conversationRepo.getConversationById(summary.id)
+                    if (conv != null) {
+                        allMessages.addAll(conv.messageNodes.flatMap { it.messages })
+                    }
+                    // Updating progress partially for fetching, but mostly it's fast
+                    _vectorizationProgress.value = (index + 1) * 0.1f / summaries.size
+                }
+
+                // The chunkAndStoreConversation handles the actual chunking, embedding, storing
+                // We'll let it block here, ideally we could pass a progress callback but for now it's fine.
+                _debugStatus.value = "Collected ${allMessages.size} msgs from ${summaries.size} convs. Chunking..."
+                Log.d(TAG, "vectorizeChat: collected ${allMessages.size} messages total")
+                _vectorizationProgress.value = 0.5f
+
+                conversationChunkRepository.chunkAndStoreConversation(
+                    assistantId = assistantId.toString(),
+                    messages = allMessages,
+                    chunkSize = _chunkSize.value,
+                    overlapPercent = _overlapPercent.value,
+                    embeddingService = embeddingService,
+                    onProgress = { current, total ->
+                        _vectorizationProgress.value = 0.5f + 0.5f * (current.toFloat() / total)
+                        _debugStatus.value = "Embedding: $current / $total chunks"
+                    }
+                )
+
+                updateChunkCounts()
+                val total = _totalChunks.value
+                _isVectorizing.value = false
+                onComplete(total)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to vectorize chat", e)
+                _isVectorizing.value = false
+                onComplete(0)
+            }
         }
     }
 
@@ -62,6 +175,15 @@ class AssistantDetailVM(
         }.stateIn(
             scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = Assistant()
         )
+
+    init {
+        // Load persisted chunk settings once assistant is available
+        viewModelScope.launch {
+            val a = assistant.first { it.id != kotlin.uuid.Uuid.NIL }
+            _chunkSize.value = a.chunkSize
+            _overlapPercent.value = a.overlapPercent
+        }
+    }
 
     val memories = assistant
         .flatMapLatest { currentAssistant ->
@@ -190,6 +312,55 @@ class AssistantDetailVM(
     fun deleteMemory(memory: AssistantMemory) {
         viewModelScope.launch {
             memoryRepository.deleteMemory(id = memory.id)
+        }
+    }
+
+    fun vectorizeAllMemories(onComplete: (Int) -> Unit) {
+        Log.d(TAG, "vectorizeAllMemories called, embeddingService configured: ${embeddingService.isConfigured}")
+        if (!embeddingService.isConfigured) {
+            Log.w(TAG, "EmbeddingService has no API key, skipping vectorization")
+            onComplete(0)
+            return
+        }
+        if (_isVectorizing.value) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _isVectorizing.value = true
+            _vectorizationProgress.value = 0f
+
+            val assistantIdStr = if (assistant.value.useGlobalMemory) {
+                MemoryRepository.GLOBAL_MEMORY_ID
+            } else {
+                assistantId.toString()
+            }
+            Log.d(TAG, "vectorize: assistantId=$assistantIdStr")
+
+            val allMemories = memoryRepository.getMemoryEntitiesOfAssistant(assistantIdStr)
+            val toProcess = allMemories.filter { it.embedding == null }
+            Log.d(TAG, "vectorize: total=${allMemories.size}, toProcess=${toProcess.size}")
+
+            if (toProcess.isEmpty()) {
+                _isVectorizing.value = false
+                onComplete(0)
+                return@launch
+            }
+
+            var count = 0
+            toProcess.forEachIndexed { index, memory ->
+                try {
+                    val embedding = embeddingService.embed(memory.content)
+                    if (embedding != null) {
+                        memoryRepository.updateEmbedding(memory.id, embedding.toByteArray())
+                        count++
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to vectorize memory ${memory.id}", e)
+                }
+                _vectorizationProgress.value = (index + 1).toFloat() / toProcess.size
+            }
+
+            _isVectorizing.value = false
+            onComplete(count)
         }
     }
 

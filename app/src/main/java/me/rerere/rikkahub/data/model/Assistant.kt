@@ -41,6 +41,16 @@ data class Assistant(
     val lorebookIds: Set<Uuid> = emptySet(),            // 关联的 Lorebook ID
     val enabledSkills: Set<String> = emptySet(),        // 启用的 skill 名称列表
     val enableTimeReminder: Boolean = false,            // 时间间隔提醒注入
+    val ragEnabled: Boolean = false,
+    val ragPosition: InjectionPosition = InjectionPosition.AFTER_SYSTEM_PROMPT,
+    val ragDepth: Int = 4,
+    val ragRole: MessageRole = MessageRole.SYSTEM,
+    val ragTemplate: String = "Past events:\n{{text}}",
+    val ragTopK: Int = 3,
+    val ragThreshold: Float = 0.65f,
+    val ragSkipRecentMessages: Int = 8,
+    val chunkSize: Int = 4000,
+    val overlapPercent: Int = 15,
 )
 
 @Serializable
@@ -54,6 +64,7 @@ data class QuickMessage(
 data class AssistantMemory(
     val id: Int,
     val content: String = "",
+    val embedding: ByteArray? = null,
 )
 
 @Serializable

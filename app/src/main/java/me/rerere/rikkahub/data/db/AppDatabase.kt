@@ -29,9 +29,10 @@ import me.rerere.rikkahub.utils.JsonInstant
         GenMediaEntity::class,
         MessageNodeEntity::class,
         ManagedFileEntity::class,
-        FavoriteEntity::class
+        FavoriteEntity::class,
+        me.rerere.rikkahub.data.db.entity.ConversationChunkEntity::class
     ],
-    version = 17,
+    version = 20,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
@@ -44,10 +45,15 @@ import me.rerere.rikkahub.utils.JsonInstant
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 12, to = 13),
         AutoMigration(from = 16, to = 17, spec = Migration_16_17::class),
+        AutoMigration(from = 17, to = 18),
+        AutoMigration(from = 18, to = 19),
+        AutoMigration(from = 19, to = 20),
     ]
 )
 @TypeConverters(TokenUsageConverter::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun conversationChunkDao(): me.rerere.rikkahub.data.db.dao.ConversationChunkDAO
+
     abstract fun conversationDao(): ConversationDAO
 
     abstract fun memoryDao(): MemoryDAO

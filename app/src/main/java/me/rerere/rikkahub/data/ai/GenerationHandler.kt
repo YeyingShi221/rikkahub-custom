@@ -40,6 +40,7 @@ import me.rerere.rikkahub.data.datastore.findModelById
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMemory
+import me.rerere.rikkahub.data.db.entity.toByteArray
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.utils.applyPlaceholders
@@ -73,6 +74,7 @@ class GenerationHandler(
         memories: List<AssistantMemory>? = null,
         tools: List<Tool> = emptyList(),
         maxSteps: Int = 256,
+        embeddingService: EmbeddingService? = null,
     ): Flow<GenerationChunk> = flow {
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
         val providerImpl = providerManager.getProviderByType(provider)
@@ -93,10 +95,36 @@ class GenerationHandler(
                     buildMemoryTools(
                         json = json,
                         onCreation = { content ->
-                            memoryRepo.addMemory(memoryAssistantId, content)
+                            val memory = memoryRepo.addMemory(memoryAssistantId, content)
+                            if (embeddingService != null) {
+                                try {
+                                    val embedding = embeddingService.embed(content)
+                                    if (embedding != null) {
+                                        memoryRepo.updateEmbedding(memory.id, embedding.toByteArray())
+                                        Log.d(TAG, "Embedded new memory: ${memory.id}")
+                                    } else {
+                                        Log.w(TAG, "Failed to embed new memory: ${memory.id}")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error embedding new memory: ${memory.id}", e)
+                                }
+                            }
+                            memory
                         },
                         onUpdate = { id, content ->
-                            memoryRepo.updateContent(id, content)
+                            val memory = memoryRepo.updateContent(id, content)
+                            if (embeddingService != null) {
+                                try {
+                                    val embedding = embeddingService.embed(content)
+                                    if (embedding != null) {
+                                        memoryRepo.updateEmbedding(id, embedding.toByteArray())
+                                        Log.d(TAG, "Updated embedding for memory: $id")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error updating embedding for memory: $id", e)
+                                }
+                            }
+                            memory
                         },
                         onDelete = { id ->
                             memoryRepo.deleteMemory(id)
@@ -145,7 +173,8 @@ class GenerationHandler(
                     provider = provider,
                     tools = toolsInternal,
                     memories = memories ?: emptyList(),
-                    stream = assistant.streamOutput
+                    stream = assistant.streamOutput,
+                    embeddingService = embeddingService
                 )
                 messages = messages.visualTransforms(
                     transformers = outputTransformers,
@@ -261,32 +290,48 @@ class GenerationHandler(
 
                     else -> {
                         // Auto or Approved - execute the tool
-                        runCatching {
-                            val toolDef = toolsInternal.find { toolDef -> toolDef.name == tool.toolName }
-                                ?: error("Tool ${tool.toolName} not found")
-                            val args = json.parseToJsonElement(tool.input.ifBlank { "{}" })
-                            Log.i(TAG, "generateText: executing tool ${toolDef.name} with args: $args")
-                            val result = toolDef.execute(args)
-                            executedTools += tool.copy(output = result)
-                        }.onFailure {
-                            it.printStackTrace()
+                        val toolDef = toolsInternal.find { toolDef -> toolDef.name == tool.toolName }
+                        if (toolDef == null) {
+                            // Tool not registered this turn (e.g., memory disabled but model learned pattern from history).
+                            // Return a clean instruction instead of a stack trace so the model stops retrying.
+                            Log.w(TAG, "generateText: model called unregistered tool '${tool.toolName}' — returning disabled-notice")
                             executedTools += tool.copy(
                                 output = listOf(
                                     UIMessagePart.Text(
                                         json.encodeToString(
                                             buildJsonObject {
-                                                put(
-                                                    "error",
-                                                    JsonPrimitive(buildString {
-                                                        append("[${it.javaClass.name}] ${it.message}")
-                                                        append("\n${it.stackTraceToString()}")
-                                                    })
-                                                )
+                                                put("error", JsonPrimitive("The tool '${tool.toolName}' is not available in this session. Do not call it again. Proceed with your response directly."))
                                             }
                                         )
                                     )
                                 )
                             )
+                        } else {
+                            runCatching {
+                                val args = json.parseToJsonElement(tool.input.ifBlank { "{}" })
+                                Log.i(TAG, "generateText: executing tool ${toolDef.name} with args: $args")
+                                val result = toolDef.execute(args)
+                                executedTools += tool.copy(output = result)
+                            }.onFailure {
+                                it.printStackTrace()
+                                executedTools += tool.copy(
+                                    output = listOf(
+                                        UIMessagePart.Text(
+                                            json.encodeToString(
+                                                buildJsonObject {
+                                                    put(
+                                                        "error",
+                                                        JsonPrimitive(buildString {
+                                                            append("[${it.javaClass.name}] ${it.message}")
+                                                            append("\n${it.stackTraceToString()}")
+                                                        })
+                                                    )
+                                                }
+                                            )
+                                        )
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -331,7 +376,8 @@ class GenerationHandler(
         provider: ProviderSetting,
         tools: List<Tool>,
         memories: List<AssistantMemory>,
-        stream: Boolean
+        stream: Boolean,
+        embeddingService: EmbeddingService? = null,
     ) {
         val internalMessages = buildList {
             val system = buildString {
@@ -340,7 +386,7 @@ class GenerationHandler(
                     append(assistant.systemPrompt)
                 }
 
-                // 记忆
+                // 记忆 (original behavior: inject all memories)
                 if (assistant.enableMemory) {
                     appendLine()
                     append(buildMemoryPrompt(memories = memories))

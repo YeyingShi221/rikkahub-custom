@@ -516,6 +516,8 @@ enum class ChatFontFamily {
     SERIF,
     @SerialName("monospace")
     MONOSPACE,
+    @SerialName("lxgw_wenkai_mono")
+    LXGW_WENKAI,
 }
 
 @Serializable
@@ -529,6 +531,7 @@ data class DisplaySetting(
     val showModelName: Boolean = true,
     val showDateBelowName: Boolean = false,
     val showTokenUsage: Boolean = true,
+    val showReasoningTokens: Boolean = true,
     val showThinkingContent: Boolean = true,
     val autoCloseThinking: Boolean = true,
     val showUpdates: Boolean = true,

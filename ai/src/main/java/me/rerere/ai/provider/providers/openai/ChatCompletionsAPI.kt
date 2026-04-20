@@ -674,9 +674,13 @@ class ChatCompletionsAPI(
 
     private fun parseTokenUsage(jsonObject: JsonObject?): TokenUsage? {
         if (jsonObject == null) return null
+        val totalCompletion = jsonObject["completion_tokens"]?.jsonPrimitive?.intOrNull ?: 0
+        val reasoningTokens = jsonObject["completion_tokens_details"]?.jsonObjectOrNull
+            ?.get("reasoning_tokens")?.jsonPrimitive?.intOrNull ?: 0
         return TokenUsage(
             promptTokens = jsonObject["prompt_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
-            completionTokens = jsonObject["completion_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
+            completionTokens = (totalCompletion - reasoningTokens).coerceAtLeast(0),
+            reasoningTokens = reasoningTokens,
             totalTokens = jsonObject["total_tokens"]?.jsonPrimitive?.intOrNull ?: 0,
             cachedTokens = jsonObject["prompt_tokens_details"]?.jsonObjectOrNull?.get("cached_tokens")?.jsonPrimitive?.intOrNull
                 ?: 0

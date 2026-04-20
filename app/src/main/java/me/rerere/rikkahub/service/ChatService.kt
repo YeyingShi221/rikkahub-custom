@@ -49,6 +49,7 @@ import me.rerere.rikkahub.CHAT_LIVE_UPDATE_NOTIFICATION_CHANNEL_ID
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.RouteActivity
 import me.rerere.rikkahub.data.ai.GenerationChunk
+import me.rerere.rikkahub.data.ai.EmbeddingService
 import me.rerere.rikkahub.data.ai.GenerationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.LocalTools
@@ -62,6 +63,7 @@ import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.PromptInjectionTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
 import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
+import me.rerere.rikkahub.data.ai.transformers.ChatRagTransformer
 import me.rerere.rikkahub.data.ai.transformers.ThinkTagTransformer
 import me.rerere.rikkahub.data.ai.transformers.TimeReminderTransformer
 import me.rerere.rikkahub.data.datastore.SettingsStore
@@ -127,6 +129,8 @@ class ChatService(
     val mcpManager: McpManager,
     private val filesManager: FilesManager,
     private val skillManager: SkillManager,
+    private val embeddingService: EmbeddingService,
+    private val conversationChunkRepository: me.rerere.rikkahub.data.repository.ConversationChunkRepository,
 ) {
     // 统一会话管理
     private val sessions = ConcurrentHashMap<Uuid, ConversationSession>()
@@ -493,9 +497,11 @@ class ChatService(
                 },
                 inputTransformers = buildList {
                     addAll(inputTransformers)
+                    add(ChatRagTransformer(embeddingService, conversationChunkRepository))
                     add(templateTransformer)
                 },
                 outputTransformers = outputTransformers,
+                embeddingService = embeddingService,
                 tools = buildList {
                     if (settings.enableWebSearch) {
                         addAll(createSearchTools(settings))

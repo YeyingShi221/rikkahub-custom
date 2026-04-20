@@ -30,6 +30,9 @@ interface MemoryDAO {
     @Update
     suspend fun updateMemory(memory: MemoryEntity)
 
+    @Query("UPDATE memoryentity SET embedding = :embedding WHERE id = :id")
+    suspend fun updateEmbedding(id: Int, embedding: ByteArray)
+
     @Query("DELETE FROM memoryentity WHERE id = :id")
     suspend fun deleteMemory(id: Int)
 

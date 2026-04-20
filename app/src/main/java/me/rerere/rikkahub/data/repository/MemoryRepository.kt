@@ -14,23 +14,31 @@ class MemoryRepository(private val memoryDAO: MemoryDAO) {
     fun getMemoriesOfAssistantFlow(assistantId: String): Flow<List<AssistantMemory>> =
         memoryDAO.getMemoriesOfAssistantFlow(assistantId)
             .map { entities ->
-                entities.map { AssistantMemory(it.id, it.content) }
+                entities.map { AssistantMemory(it.id, it.content, it.embedding) }
             }
 
     suspend fun getMemoriesOfAssistant(assistantId: String): List<AssistantMemory> {
         return memoryDAO.getMemoriesOfAssistant(assistantId)
-            .map { AssistantMemory(it.id, it.content) }
+            .map { AssistantMemory(it.id, it.content, it.embedding) }
+    }
+
+    suspend fun getMemoryEntitiesOfAssistant(assistantId: String): List<MemoryEntity> {
+        return memoryDAO.getMemoriesOfAssistant(assistantId)
     }
 
     fun getGlobalMemoriesFlow(): Flow<List<AssistantMemory>> =
         memoryDAO.getMemoriesOfAssistantFlow(GLOBAL_MEMORY_ID)
             .map { entities ->
-                entities.map { AssistantMemory(it.id, it.content) }
+                entities.map { AssistantMemory(it.id, it.content, it.embedding) }
             }
 
     suspend fun getGlobalMemories(): List<AssistantMemory> {
         return memoryDAO.getMemoriesOfAssistant(GLOBAL_MEMORY_ID)
-            .map { AssistantMemory(it.id, it.content) }
+            .map { AssistantMemory(it.id, it.content, it.embedding) }
+    }
+
+    suspend fun getGlobalMemoryEntities(): List<MemoryEntity> {
+        return memoryDAO.getMemoriesOfAssistant(GLOBAL_MEMORY_ID)
     }
 
     suspend fun deleteMemoriesOfAssistant(assistantId: String) {
@@ -46,6 +54,7 @@ class MemoryRepository(private val memoryDAO: MemoryDAO) {
         return AssistantMemory(
             id = newMemory.id,
             content = newMemory.content,
+            embedding = newMemory.embedding
         )
     }
 
@@ -54,18 +63,23 @@ class MemoryRepository(private val memoryDAO: MemoryDAO) {
             id = 0,
             content = content,
         )
-        val newMemory = memory.copy(
-            id = memoryDAO.insertMemory(
-                MemoryEntity(
-                    assistantId = assistantId,
-                    content = memory.content
-                )
-            ).toInt()
+        val newMemoryEntity = MemoryEntity(
+            assistantId = assistantId,
+            content = memory.content
         )
-        return newMemory
+        val id = memoryDAO.insertMemory(newMemoryEntity).toInt()
+        return AssistantMemory(
+            id = id,
+            content = content,
+            embedding = null
+        )
     }
 
     suspend fun deleteMemory(id: Int) {
         memoryDAO.deleteMemory(id)
+    }
+
+    suspend fun updateEmbedding(id: Int, embedding: ByteArray) {
+        memoryDAO.updateEmbedding(id, embedding)
     }
 }

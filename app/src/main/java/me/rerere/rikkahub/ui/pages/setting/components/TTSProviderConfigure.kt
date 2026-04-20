@@ -56,6 +56,8 @@ fun TTSProviderConfigure(
                         is TTSProviderSetting.Groq -> "Groq"
                         is TTSProviderSetting.XAI -> "xAI"
                         is TTSProviderSetting.MiMo -> "MiMo"
+                        is TTSProviderSetting.ElevenLabs -> "ElevenLabs"
+                        is TTSProviderSetting.FishSpeech -> "Fish Speech"
                     },
                     onValueChange = {},
                     readOnly = true,
@@ -83,6 +85,8 @@ fun TTSProviderConfigure(
                                         TTSProviderSetting.Groq::class -> "Groq"
                                         TTSProviderSetting.XAI::class -> "xAI"
                                         TTSProviderSetting.MiMo::class -> "MiMo"
+                                        TTSProviderSetting.ElevenLabs::class -> "ElevenLabs"
+                                        TTSProviderSetting.FishSpeech::class -> "Fish Speech"
                                         else -> providerClass.simpleName ?: "Unknown"
                                     }
                                 )
@@ -130,6 +134,16 @@ fun TTSProviderConfigure(
                                         name = "MiMo TTS"
                                     )
 
+                                    TTSProviderSetting.ElevenLabs::class -> TTSProviderSetting.ElevenLabs(
+                                        id = setting.id,
+                                        name = "ElevenLabs TTS"
+                                    )
+
+                                    TTSProviderSetting.FishSpeech::class -> TTSProviderSetting.FishSpeech(
+                                        id = setting.id,
+                                        name = "Fish Speech TTS"
+                                    )
+
                                     else -> setting
                                 }
                                 onValueChange(newSetting)
@@ -165,6 +179,8 @@ fun TTSProviderConfigure(
             is TTSProviderSetting.Groq -> GroqTTSConfiguration(setting, onValueChange)
             is TTSProviderSetting.XAI -> XAITTSConfiguration(setting, onValueChange)
             is TTSProviderSetting.MiMo -> MiMoTTSConfiguration(setting, onValueChange)
+            is TTSProviderSetting.ElevenLabs -> ElevenLabsTTSConfiguration(setting, onValueChange)
+            is TTSProviderSetting.FishSpeech -> FishSpeechTTSConfiguration(setting, onValueChange)
         }
     }
 }
@@ -967,5 +983,136 @@ private fun XAITTSConfiguration(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ElevenLabsTTSConfiguration(
+    setting: TTSProviderSetting.ElevenLabs,
+    onValueChange: (TTSProviderSetting) -> Unit
+) {
+    // API Key
+    FormItem(
+        label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
+        description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
+    ) {
+        OutlinedTextField(
+            value = setting.apiKey,
+            onValueChange = { onValueChange(setting.copy(apiKey = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("eleven_labs_api_key") },
+        )
+    }
+
+    // Base URL
+    FormItem(
+        label = { Text(stringResource(R.string.setting_tts_page_base_url)) },
+        description = { Text(stringResource(R.string.setting_tts_page_base_url_description)) }
+    ) {
+        OutlinedTextField(
+            value = setting.baseUrl,
+            onValueChange = { onValueChange(setting.copy(baseUrl = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("https://api.elevenlabs.io/v1") }
+        )
+    }
+
+    // Model ID
+    FormItem(
+        label = { Text("Model ID") },
+    ) {
+        OutlinedTextField(
+            value = setting.modelId,
+            onValueChange = { onValueChange(setting.copy(modelId = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("eleven_multilingual_v2") }
+        )
+    }
+
+    // Voice ID
+    FormItem(
+        label = { Text("Voice ID") },
+    ) {
+        OutlinedTextField(
+            value = setting.voiceId,
+            onValueChange = { onValueChange(setting.copy(voiceId = it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    // Stability
+    FormItem(
+        label = { Text("Stability (${setting.stability})") },
+    ) {
+        OutlinedNumberInput(
+            value = setting.stability,
+            onValueChange = { onValueChange(setting.copy(stability = it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    // Similarity Boost
+    FormItem(
+        label = { Text("Similarity Boost (${setting.similarityBoost})") },
+    ) {
+        OutlinedNumberInput(
+            value = setting.similarityBoost,
+            onValueChange = { onValueChange(setting.copy(similarityBoost = it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun FishSpeechTTSConfiguration(
+    setting: TTSProviderSetting.FishSpeech,
+    onValueChange: (TTSProviderSetting) -> Unit
+) {
+    // API Key
+    FormItem(
+        label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
+        description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
+    ) {
+        OutlinedTextField(
+            value = setting.apiKey,
+            onValueChange = { onValueChange(setting.copy(apiKey = it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    // Base URL
+    FormItem(
+        label = { Text(stringResource(R.string.setting_tts_page_base_url)) },
+        description = { Text(stringResource(R.string.setting_tts_page_base_url_description)) }
+    ) {
+        OutlinedTextField(
+            value = setting.baseUrl,
+            onValueChange = { onValueChange(setting.copy(baseUrl = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("https://api.fish.audio") }
+        )
+    }
+
+    // Reference ID
+    FormItem(
+        label = { Text("Reference ID") },
+    ) {
+        OutlinedTextField(
+            value = setting.referenceId,
+            onValueChange = { onValueChange(setting.copy(referenceId = it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    // Format
+    FormItem(
+        label = { Text("Format") },
+    ) {
+        OutlinedTextField(
+            value = setting.format,
+            onValueChange = { onValueChange(setting.copy(format = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("mp3") }
+        )
     }
 }

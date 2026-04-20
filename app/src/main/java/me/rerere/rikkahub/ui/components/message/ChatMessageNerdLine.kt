@@ -81,6 +81,10 @@ fun ChatMessageNerdLine(
                             Text(text = "${usage.completionTokens.formatNumber()} tokens")
                         }
                     )
+                    // Reasoning tokens (Gemini thinkingTokenCount, DeepSeek/OpenAI reasoning_tokens)
+                    if (settings.showReasoningTokens && usage.reasoningTokens > 0) {
+                        Text(text = "💭 ${usage.reasoningTokens.formatNumber()} thinking")
+                    }
                     // TPS
                     if (message.finishedAt != null) {
                         val duration = Duration.between(

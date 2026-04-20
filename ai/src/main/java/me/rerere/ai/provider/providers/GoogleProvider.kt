@@ -722,7 +722,8 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         val totalTokens = jsonObject["totalTokenCount"]?.jsonPrimitiveOrNull?.intOrNull ?: 0
         return TokenUsage(
             promptTokens = promptTokens,
-            completionTokens = candidatesTokens + thoughtTokens,
+            completionTokens = candidatesTokens,
+            reasoningTokens = thoughtTokens,
             totalTokens = totalTokens,
             cachedTokens = cachedTokens
         )

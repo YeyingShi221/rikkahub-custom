@@ -48,6 +48,7 @@ import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.utils.UiState
 import me.rerere.rikkahub.utils.UpdateChecker
+import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.utils.toLocalString
 import java.time.LocalDate
 import java.time.ZoneId
@@ -328,6 +329,24 @@ class ChatVM(
             val updatedConversation = conversation.value.copy(title = title)
             chatService.saveConversation(_conversationId, updatedConversation)
         }
+    }
+
+    fun exportConversation(): String {
+        val conv = conversation.value
+        val currentSettings = settings.value
+        val assistant = currentSettings.getAssistantById(conv.assistantId)
+        val assistantName = assistant?.name?.ifEmpty { "Assistant" } ?: "Assistant"
+        val userName = currentSettings.displaySetting.userNickname.ifEmpty { "User" }
+        android.util.Log.d("ChatExport", "userName='$userName' assistantName='$assistantName' assistantId=${conv.assistantId}")
+        return me.rerere.rikkahub.utils.ChatExporter.exportToText(conv, userName, assistantName)
+    }
+
+    fun getExportFilename(): String {
+        val conv = conversation.value
+        val currentSettings = settings.value
+        val assistant = currentSettings.getAssistantById(conv.assistantId)
+        val assistantName = assistant?.name?.ifEmpty { "chat" } ?: "chat"
+        return me.rerere.rikkahub.utils.ChatExporter.generateFilename(conv.title, assistantName)
     }
 
     fun deleteConversation(conversation: Conversation) {

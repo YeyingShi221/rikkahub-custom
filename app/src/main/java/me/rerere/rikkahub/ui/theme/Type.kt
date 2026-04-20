@@ -20,3 +20,7 @@ val JetbrainsMono = FontFamily(
         )
     )
 )
+
+val LxgwWenkaiMono = FontFamily(
+    Font(resId = R.font.lxgw_wenkai_mono)
+)

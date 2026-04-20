@@ -125,6 +125,7 @@ fun ChatMessage(
             ChatFontFamily.DEFAULT -> FontFamily.Default
             ChatFontFamily.SERIF -> FontFamily.Serif
             ChatFontFamily.MONOSPACE -> FontFamily.Monospace
+            ChatFontFamily.LXGW_WENKAI -> me.rerere.rikkahub.ui.theme.LxgwWenkaiMono
         }
     )
     var showActionsSheet by remember { mutableStateOf(false) }
