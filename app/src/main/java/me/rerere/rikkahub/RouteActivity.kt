@@ -461,12 +461,12 @@ class RouteActivity : ComponentActivity() {
                     )
                     if (BuildConfig.DEBUG) {
                         Text(
-                            text = "[开发模式]",
+                            text = "<Pour Elle>",
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .padding(top = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                            color = androidx.compose.ui.graphics.Color(0xFF994B5C)
                         )
                     }
                     AnimatedVisibility(

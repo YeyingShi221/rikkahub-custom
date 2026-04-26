@@ -9,6 +9,7 @@ data class ConversationChunkEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo("assistant_id") val assistantId: String,
     @ColumnInfo("content") val content: String,
+    @ColumnInfo("content_hash", defaultValue = "0") val contentHash: Int = 0,
     @ColumnInfo("embedding") val embedding: ByteArray? = null,
     @ColumnInfo("chunk_index") val chunkIndex: Int = 0,
     @ColumnInfo("created_at") val createdAt: Long = System.currentTimeMillis(),

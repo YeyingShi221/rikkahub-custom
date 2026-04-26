@@ -23,6 +23,9 @@ interface ConversationChunkDAO {
     @Query("SELECT COUNT(*) FROM conversation_chunk WHERE assistant_id = :assistantId AND embedding IS NOT NULL")
     suspend fun getEmbeddedChunkCountOfAssistant(assistantId: String): Int
 
+    @Query("SELECT content_hash FROM conversation_chunk WHERE assistant_id = :assistantId AND embedding IS NOT NULL")
+    suspend fun getEmbeddedHashesOfAssistant(assistantId: String): List<Int>
+
     @Query("UPDATE conversation_chunk SET embedding = NULL WHERE assistant_id = :assistantId")
     suspend fun clearAllEmbeddings(assistantId: String)
 
@@ -31,4 +34,7 @@ interface ConversationChunkDAO {
 
     @Query("DELETE FROM conversation_chunk WHERE assistant_id = :assistantId")
     suspend fun deleteAllChunks(assistantId: String)
+
+    @Query("DELETE FROM conversation_chunk WHERE assistant_id = :assistantId AND content_hash = :hash")
+    suspend fun deleteByHash(assistantId: String, hash: Int)
 }

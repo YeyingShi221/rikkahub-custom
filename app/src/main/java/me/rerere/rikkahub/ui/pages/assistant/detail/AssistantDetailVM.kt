@@ -59,6 +59,7 @@ class AssistantDetailVM(
 
     private val _isVectorizing = MutableStateFlow(false)
     val isVectorizing = _isVectorizing.asStateFlow()
+    private var _deepChangeWarningShown = false
 
     private val _vectorizationProgress = MutableStateFlow(0f)
     val vectorizationProgress = _vectorizationProgress.asStateFlow()
@@ -128,11 +129,27 @@ class AssistantDetailVM(
                     _vectorizationProgress.value = (index + 1) * 0.1f / summaries.size
                 }
 
-                // The chunkAndStoreConversation handles the actual chunking, embedding, storing
-                // We'll let it block here, ideally we could pass a progress callback but for now it's fine.
-                _debugStatus.value = "Collected ${allMessages.size} msgs from ${summaries.size} convs. Chunking..."
+                _debugStatus.value = "Collected ${allMessages.size} msgs from ${summaries.size} convs. Checking changes..."
                 Log.d(TAG, "vectorizeChat: collected ${allMessages.size} messages total")
                 _vectorizationProgress.value = 0.5f
+
+                // Preview changes before committing — warn once, force on second click
+                val preview = conversationChunkRepository.previewChanges(
+                    assistantId = assistantId.toString(),
+                    messages = allMessages,
+                    chunkSize = _chunkSize.value,
+                    overlapPercent = _overlapPercent.value
+                )
+
+                if (preview.needsConfirmation && !_deepChangeWarningShown) {
+                    _deepChangeWarningShown = true
+                    _debugStatus.value = "⚠ 深层改动：${preview.staleChunks}个chunk受影响。再按一次确认。"
+                    Log.w(TAG, "Deep swipe detected: ${preview.staleChunks} stale, depth=${preview.firstChangeDepth}. Waiting for confirmation.")
+                    _isVectorizing.value = false
+                    onComplete(_totalChunks.value)
+                    return@launch
+                }
+                _deepChangeWarningShown = false
 
                 conversationChunkRepository.chunkAndStoreConversation(
                     assistantId = assistantId.toString(),

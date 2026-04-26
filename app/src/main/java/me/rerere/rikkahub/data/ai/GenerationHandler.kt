@@ -98,7 +98,7 @@ class GenerationHandler(
                     } else {
                         assistant.id.toString()
                     }
-                    fun embedMemory(id: Long, content: String) {
+                    suspend fun embedMemory(id: Int, content: String) {
                         if (embeddingService == null) return
                         try {
                             embeddingService.embed(content)?.let {
@@ -113,12 +113,12 @@ class GenerationHandler(
                         json = json,
                         onCreation = { content ->
                             memoryRepo.addMemory(memoryAssistantId, content).also {
-                                embedMemory(it.id, content)
+                                embedMemory(it.id.toInt(), content)
                             }
                         },
                         onUpdate = { id, content ->
                             memoryRepo.updateContent(id, content).also {
-                                embedMemory(id, content)
+                                embedMemory(id.toInt(), content)
                             }
                         },
                         onDelete = { id ->
