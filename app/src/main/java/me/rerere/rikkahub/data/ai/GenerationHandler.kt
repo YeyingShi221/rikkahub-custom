@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.datetime.TimeZone
@@ -80,7 +81,11 @@ class GenerationHandler(
         memories: List<AssistantMemory>? = null,
         tools: List<Tool> = emptyList(),
         maxSteps: Int = 256,
+
         embeddingService: EmbeddingService? = null,
+ 
+        processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
+
     ): Flow<GenerationChunk> = flow {
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
         val providerImpl = providerManager.getProviderByType(provider)
@@ -169,7 +174,11 @@ class GenerationHandler(
                     tools = toolsInternal,
                     memories = memories ?: emptyList(),
                     stream = assistant.streamOutput,
+
                     embeddingService = embeddingService
+ 
+                    processingStatus = processingStatus,
+
                 )
                 messages = messages.visualTransforms(
                     transformers = outputTransformers,
@@ -335,7 +344,11 @@ class GenerationHandler(
         tools: List<Tool>,
         memories: List<AssistantMemory>,
         stream: Boolean,
+
         embeddingService: EmbeddingService? = null,
+ 
+        processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
+
     ) {
         val internalMessages = buildList {
             val system = buildString {
@@ -367,7 +380,8 @@ class GenerationHandler(
             context = context,
             model = model,
             assistant = assistant,
-            settings = settings
+            settings = settings,
+            processingStatus = processingStatus,
         )
 
         var messages: List<UIMessage> = messages
