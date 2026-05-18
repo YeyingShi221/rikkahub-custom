@@ -48,6 +48,7 @@ import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.utils.applyPlaceholders
 import java.util.Locale
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 private const val TAG = "GenerationHandler"
 
@@ -81,11 +82,11 @@ class GenerationHandler(
         memories: List<AssistantMemory>? = null,
         tools: List<Tool> = emptyList(),
         maxSteps: Int = 256,
-
         embeddingService: EmbeddingService? = null,
- 
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
-
+        conversationSystemPrompt: String? = null,
+        conversationModeInjectionIds: Set<Uuid> = emptySet(),
+        conversationLorebookIds: Set<Uuid> = emptySet(),
     ): Flow<GenerationChunk> = flow {
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
         val providerImpl = providerManager.getProviderByType(provider)
@@ -175,10 +176,11 @@ class GenerationHandler(
                     memories = memories ?: emptyList(),
                     stream = assistant.streamOutput,
 
-                    embeddingService = embeddingService
- 
+                    embeddingService = embeddingService,
                     processingStatus = processingStatus,
-
+                    conversationSystemPrompt = conversationSystemPrompt,
+                    conversationModeInjectionIds = conversationModeInjectionIds,
+                    conversationLorebookIds = conversationLorebookIds,
                 )
                 messages = messages.visualTransforms(
                     transformers = outputTransformers,
@@ -289,14 +291,19 @@ class GenerationHandler(
                                 output = errorOutput("The tool '${tool.toolName}' is not available in this session. Do not call it again. Proceed with your response directly.")
                             )
                         } else {
-                            try {
-                                val args = json.parseToJsonElement(tool.input.ifBlank { "{}" })
+                            runCatching {
+                                val args = runCatching {
+                                    json.parseToJsonElement(tool.input.ifBlank { "{}" })
+                                }.getOrElse {
+                                    error("Invalid tool arguments JSON for ${toolDef.name}: ${it.message}")
+                                }
                                 Log.i(TAG, "generateText: executing tool ${toolDef.name} with args: $args")
-                                executedTools += tool.copy(output = toolDef.execute(args))
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Tool execution failed: ${toolDef.name}", e)
+                                val result = toolDef.execute(args)
+                                executedTools += tool.copy(output = result)
+                            }.onFailure {
+                                it.printStackTrace()
                                 executedTools += tool.copy(
-                                    output = errorOutput("[${e.javaClass.name}] ${e.message}\n${e.stackTraceToString()}")
+                                    output = errorOutput("[${it.javaClass.name}] ${it.message}\n${it.stackTraceToString()}")
                                 )
                             }
                         }
@@ -346,15 +353,21 @@ class GenerationHandler(
         stream: Boolean,
 
         embeddingService: EmbeddingService? = null,
- 
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
-
+        conversationSystemPrompt: String? = null,
+        conversationModeInjectionIds: Set<Uuid> = emptySet(),
+        conversationLorebookIds: Set<Uuid> = emptySet(),
     ) {
         val internalMessages = buildList {
             val system = buildString {
-                // 如果助手有系统提示，则添加到消息中
-                if (assistant.systemPrompt.isNotBlank()) {
-                    append(assistant.systemPrompt)
+                val effectiveSystemPrompt =
+                    if (assistant.allowConversationSystemPrompt && !conversationSystemPrompt.isNullOrBlank()) {
+                        conversationSystemPrompt
+                    } else {
+                        assistant.systemPrompt
+                    }
+                if (effectiveSystemPrompt.isNotBlank()) {
+                    append(effectiveSystemPrompt)
                 }
 
                 // 记忆 (original behavior: inject all memories)
@@ -381,6 +394,8 @@ class GenerationHandler(
             model = model,
             assistant = assistant,
             settings = settings,
+            conversationModeInjectionIds = conversationModeInjectionIds,
+            conversationLorebookIds = conversationLorebookIds,
             processingStatus = processingStatus,
         )
 

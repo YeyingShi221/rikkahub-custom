@@ -85,6 +85,7 @@ import me.rerere.rikkahub.ui.components.richtext.buildMarkdownPreviewHtml
 import me.rerere.rikkahub.ui.components.ui.ChainOfThought
 import me.rerere.rikkahub.ui.components.ui.Favicon
 import me.rerere.rikkahub.ui.context.LocalNavController
+import me.rerere.rikkahub.ui.modifier.shimmer
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.theme.extendColors
 import me.rerere.rikkahub.data.datastore.ChatFontFamily
@@ -353,8 +354,8 @@ private fun MessagePartsBlock(
                             if (role == MessageRole.USER) {
                                 Surface(
                                     modifier = Modifier.animateContentSize(),
-                                    shape = MaterialTheme.shapes.medium,
-                                    tonalElevation = 2.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
                                     onClick = { onUserMessageClick?.invoke() },
                                 ) {
                                     Column(modifier = Modifier.padding(8.dp)) {
@@ -372,8 +373,8 @@ private fun MessagePartsBlock(
                                 if (settings.displaySetting.showAssistantBubble) {
                                     Surface(
                                         modifier = Modifier.animateContentSize(),
-                                        shape = MaterialTheme.shapes.medium,
-                                        tonalElevation = 2.dp,
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
                                             MarkdownBlock(
@@ -460,13 +461,25 @@ private fun MessagePartsBlock(
                     }
 
                     is UIMessagePart.Image -> {
-                        ZoomableAsyncImage(
-                            model = part.url,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.medium)
-                                .height(72.dp)
-                        )
+                        val isImageLoading =
+                            part.url.isBlank() || part.url.matches(Regex("^data:image/[^;]*;base64,\\s*$"))
+                        if (isImageLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .shimmer(isLoading = true)
+                            )
+                        } else {
+                            ZoomableAsyncImage(
+                                model = part.url,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .height(72.dp)
+                            )
+                        }
                     }
 
                     is UIMessagePart.Document -> {

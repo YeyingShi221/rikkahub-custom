@@ -21,8 +21,8 @@ android {
         applicationId = "me.rerere.rikkahub"
         minSdk = 26
         targetSdk = 37
-        versionCode = 153
-        versionName = "2.1.10"
+        versionCode = 159
+        versionName = "2.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -224,6 +224,7 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.coil.okhttp)
     implementation(libs.coil.svg)
+    implementation(libs.coil.cache.control)
 
     // serialization
     implementation(libs.kotlinx.serialization.json)
@@ -287,7 +288,7 @@ dependencies {
     implementation(project(":document"))
     implementation(project(":highlight"))
     implementation(project(":search"))
-    implementation(project(":tts"))
+    implementation(project(":speech"))
     implementation(project(":common"))
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
     implementation(kotlin("reflect"))

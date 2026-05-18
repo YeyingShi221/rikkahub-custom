@@ -249,7 +249,7 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
 
                 try {
                     val jsonData = json.parseToJsonElement(data).jsonObject
-                    val reason = 
+                    val reason =
                         jsonData["promptFeedback"]?.jsonObject?.get("blockReason")?.jsonPrimitiveOrNull?.contentOrNull
                     if (reason != null) {
                         close(RuntimeException("Prompt feedback: $reason"))
@@ -460,6 +460,8 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
                                 put("urlContext", buildJsonObject {})
                             })
                         }
+
+                        else -> {}
                     }
                 }
             })
@@ -708,7 +710,7 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
     private fun UIMessagePart.Tool.toFunctionCallPart() = buildJsonObject {
         put("functionCall", buildJsonObject {
             put("name", toolName)
-            put("args", json.parseToJsonElement(input.ifBlank { "{}" }))
+            put("args", inputAsJson())
         })
         metadata?.get("thoughtSignature")?.let {
             put("thoughtSignature", it)
