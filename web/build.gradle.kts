@@ -10,7 +10,8 @@ val buildWebUi = tasks.register<Exec>("buildWebUi") {
     description = "Build web-ui and copy its static output into the web module resources."
 
     workingDir = webUiDir.asFile
-    commandLine("pnpm", "run", "build")
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    commandLine(if (isWindows) "pnpm.cmd" else "pnpm", "run", "build")
 
     inputs.files(
         webUiDir.file("package.json"),
