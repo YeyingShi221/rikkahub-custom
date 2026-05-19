@@ -86,7 +86,7 @@ class ChatRagTransformer(
             return messages
         }
 
-        Log.d(TAG, "Found \${similarChunks.size} similar chunks")
+        Log.d(TAG, "Found ${similarChunks.size} similar chunks")
 
         // Format RAG content
         val joinedChunks = similarChunks.joinToString("\n---\n") { it.chunk.content }

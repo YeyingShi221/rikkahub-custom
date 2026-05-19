@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 21,
-    "identityHash": "b6964cbd335ea711f5e097f4828ef79f",
+    "version": 22,
+    "identityHash": "36de203dcb77bb0d64209c74858d3782",
     "entities": [
       {
         "tableName": "ConversationEntity",
@@ -485,7 +485,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b6964cbd335ea711f5e097f4828ef79f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '36de203dcb77bb0d64209c74858d3782')"
     ]
   }
 }
